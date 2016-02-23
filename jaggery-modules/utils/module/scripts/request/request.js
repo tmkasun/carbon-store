@@ -87,5 +87,19 @@ var log = new Log('request_module');
         }
         searchQuery = searchQuery.trim();
         return searchQuery;
-    }
+    };
+    // Fix for REGISTRY-3245
+    request.parseContentType = function(contentTypString) {
+        var comps = contentTypString.split(';');
+        return comps[0];
+    };
+
+    /**
+     * Returns the referer in a request if one is present
+     */
+    request.getReferer = function(req,context) {
+        var queryString = this.getQueryOptions(req.getQueryString());
+        return queryString.referer || '';
+    };
+
 }(request))

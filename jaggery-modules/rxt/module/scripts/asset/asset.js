@@ -679,13 +679,27 @@ var asset = {};
         q  = buildQueryString(query, options);
         return q;
     };
-    var doAdvanceSearch = function(type,query,paging,registry,rxtManager) {
+    var doAdvanceSearch = function(type,query,paging,registry,rxtManager,tenantId) {
+        var app = require('rxt').app;
         var assets = null;
         var q;
         var governanceRegistry;
         var mediaType = '';
         if(type){
             mediaType = rxtManager.getMediaType(type);
+        } else if(tenantId) {
+            var availableTypes = app.getUIActivatedAssets(tenantId);
+            mediaType = '(';
+            for (var index in availableTypes) {
+                if (availableTypes.hasOwnProperty(index)) {
+                    if (index == 0) {
+                        mediaType = mediaType + rxtManager.getMediaType(availableTypes[index]);
+                    } else {
+                        mediaType = mediaType + ' OR ' + rxtManager.getMediaType(availableTypes[index]);
+                    }
+                }
+            }
+            mediaType = mediaType + ')';
         }
         try {
             if (log.isDebugEnabled()) {
@@ -752,7 +766,7 @@ var asset = {};
         }
         rxtManager = core.rxtManager(tenantId);
         registry = userRegistry.registry;
-        assets = doAdvanceSearch(type, query, paging, registry, rxtManager);
+        assets = doAdvanceSearch(type, query, paging, registry, rxtManager, tenantId);
         //assets is a set that must be converted to a JSON array
         if (log.isDebugEnabled()) {
             log.debug('[advance search] about to process result set');
@@ -1507,7 +1521,6 @@ var asset = {};
         var existingAsset = this.get(options.id);
         var ctx = rxtModule.core.createUserAssetContext(session,options.type);
         var context = rxtModule.core.createUserAssetContext(session, options.type);
-        //var nameAttribute = this.getName(existingAsset);
         var oldId = existingAsset.id;
         delete existingAsset.id;
 
@@ -1516,8 +1529,16 @@ var asset = {};
         }
 
         existingAttributes.attributes = existingAsset.attributes;
-        //TODO remove hardcoded attributename
-        existingAttributes.name = existingAsset.attributes['overview_name'];
+        var nameAttribute = this.getName(existingAsset);
+
+        if(nameAttribute != 'undefined'){
+            existingAttributes.name = nameAttribute;
+        } else if(existingAsset.attributes['overview_name'] != 'undefined'){
+            existingAttributes.name = existingAsset.attributes['overview_name'];
+        } else {
+            log.error('Unable to derive the name attribute');
+            return false;
+        }
 
         var tags = this.registry.tags(existingAsset.path);
 

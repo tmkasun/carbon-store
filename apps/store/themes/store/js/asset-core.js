@@ -15,6 +15,7 @@ var asset = {};
             method: 'POST',
             success: function (data) {
                 messages.alertSuccess("Successfully subscribed to asset");
+                $('i',elem).removeClass('store-bookmark').addClass('store-bookmarked');
                 $(elem).find("i").removeClass().addClass('fa fa-star');
                 $(elem).find('#main-bookmark').html("Bookmarked");
                 $(elem).attr('id', 'btn-remove-subscribe');
@@ -40,6 +41,7 @@ var asset = {};
             dataType: 'text json',
             success: function (data) {
                 messages.alertSuccess("Successfully un-subscribed to asset");
+                $('i',elem).removeClass('store-bookmarked').addClass('store-bookmark');
                 $(elem).find("i").removeClass().addClass('fw fw-bookmark');
                 $(elem).find('#main-bookmark').html("Bookmark");
                 $(elem).attr('id', 'btn-add-gadget');

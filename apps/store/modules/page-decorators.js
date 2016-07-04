@@ -42,6 +42,7 @@ var pageDecorators = {};
         page.isUserDomainAndUrlDomainDifferent = tenantAppResources.isUserDomainAndUrlDomainDifferent;
         page.navigationBar = {};
         var isLandingPage = true;
+        var noTypeSelected = true;
         for (var index in availableTypes) {
             type = availableTypes[index];
             if (permissionsAPI.hasAssetPermission(permissionsAPI.ASSET_LIST, type, ctx.tenantId, ctx.username)) {
@@ -53,10 +54,12 @@ var pageDecorators = {};
                     currentType.selected = true;
                     currentType.style = "active home top-item";
                     isLandingPage = false;
+                    noTypeSelected = false;
                 }
                 types.push(currentType);
             }
         }
+        page.navigationBar.noTypeSelected = noTypeSelected;
         page.navigationBar.types = types;
         page.navigationBar.landingPage = isLandingPage;
         return page;
@@ -152,6 +155,7 @@ var pageDecorators = {};
             var childValues = [];
             var childFields = [];
             updatedCategorizationField.text = categorizationField.name.label;
+            updatedCategorizationField.priority = categorizationField.priority;
             updatedCategorizationField.id = parentId;
             updatedCategorizationField.divId = parentId + index;
             if (ctx.rxtManager.isSolarFacetsEnabled(ctx.assetType)) {
@@ -184,6 +188,11 @@ var pageDecorators = {};
                 isVisible = true;
             }
         }
+
+        updatedCategorizationFields.sort(function (field1, field2) {
+            return parseInt(field1.priority) - parseInt(field2.priority);
+        });
+
         page.assetCategoryFilterDetails = updatedCategorizationFields;
         page.isVisible = isVisible;
     };
@@ -221,7 +230,7 @@ var pageDecorators = {};
             'count': 8,
             'sortOrder': 'desc',
             'sortBy': 'createdDate',
-            'paginationLimit': 8 
+            'paginationLimit': 8
         };
 
         // check whether the given query is a mediaType search query. Due to REGISTRY-3379.
@@ -680,12 +689,8 @@ var pageDecorators = {};
     var doTermSearch = function (ctx, facetField, paging, authRequired) {
         var terms = [];
         var results;
-        var categoryField;
-        if(ctx.assetType) {
-            categoryField = ctx.rxtManager.getCategoryField(ctx.assetType);
-        }
         var selectedTag;
-        var map = HashMap();
+        var map = new HashMap();
         var mediaType;
         var searchPage = '/pages/top-assets';
         var rxtManager = ctx.rxtManager;
@@ -711,13 +716,7 @@ var pageDecorators = {};
         var q = request.getParameter("q");
         if (q) {
             var options = parse("{" + q + "}");
-            if (options.category) {
-                var list = new ArrayList();
-                list.add(options.category);
-                if(categoryField) {
-                    map.put(categoryField, list);
-                }
-            }
+            map = buildQueryMap(ctx, options);
             if (options.tags) {
                 selectedTag = options.tags;
             }
@@ -747,6 +746,52 @@ var pageDecorators = {};
             }
         }
         return terms;
+    };
+
+    /**
+     * Builds the criteria map to do the facet search.
+     *
+     * @param ctx           context
+     * @param options       query options
+     * @returns {HashMap}   map of criteria
+     */
+    var buildQueryMap = function (ctx, options) {
+        var possibleKeys = ['taxonomy', '_default', 'name', 'version', 'tags', 'lcName', 'lcState'];
+        var rxtManager = ctx.rxtManager;
+        var assetType = ctx.assetType;
+        var map = new HashMap();
+        var list;
+        var keys = Object.keys(options);
+        keys.forEach(function (key) {
+            var searchKey = key;
+            if (searchKey === 'name' || searchKey === '_default') {
+                searchKey = rxtManager.getNameAttribute(assetType);
+            } else if (searchKey === 'version') {
+                searchKey = rxtManager.getVersionAttribute(assetType);
+            }
+
+            list = new ArrayList();
+            if (possibleKeys.indexOf(key) > -1) {
+                list.add('*' + options[key] + '*');
+            } else {
+                list.add(options[key]);
+            }
+
+            map.put(searchKey, list);
+        });
+
+        if (options.category) {
+            var categoryField;
+            if (ctx.assetType) {
+                categoryField = rxtManager.getCategoryField(assetType);
+            }
+            list = new ArrayList();
+            list.add(options.category);
+            if (categoryField) {
+                map.put(categoryField, list);
+            }
+        }
+        return map;
     };
 
     var selectedTag = function (ctx) {
